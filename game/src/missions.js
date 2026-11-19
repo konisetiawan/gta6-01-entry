@@ -1,25 +1,10 @@
-import { CONFIG } from './config.js';
-export const MISSIONS = [
-  { id: 1, title: 'First Fare', giver: 'Mama Rosa', briefing: 'Take Rosa’s sealed package down to the marina. Keep the car clean and the route quiet.', objectives: ['Drive the package to the marina waypoint'], waypoint: { x: 1950, y: 3870 }, reward: 300 },
-  { id: 2, title: 'Hot Wheels', giver: 'Mama Rosa', briefing: 'A red sport coupe is parked in Old Town. Bring it back to the garage in one piece.', objectives: ['Steal a sport car', 'Deliver it to the garage'], waypoint: { x: 1050, y: 2400 }, garage: { x: 560, y: 2740 }, reward: 550 },
-  { id: 3, title: 'Payback Time', giver: 'Mama Rosa', briefing: 'The crew is watching. Shake the patrols at two stars, then get home to the safehouse.', objectives: ['Lose a 2-star wanted level', 'Reach the safehouse'], waypoint: { x: 3180, y: 900 }, reward: 750 },
-  { id: 4, title: 'Beach Run', giver: 'Mama Rosa', briefing: 'A cooler needs to cross the city before the ice melts. The clock is already running.', objectives: ['Make the timed delivery at Solmar Beach'], waypoint: { x: 580, y: 3710 }, reward: 950, time: 100 },
-  { id: 5, title: 'The Big Score', giver: 'Mama Rosa', briefing: 'Crack the Downtown vault, then outrun a three-star response to the marina boat.', objectives: ['Rob the Downtown bank vault', 'Escape at the marina boat'], waypoint: { x: 2300, y: 1550 }, boat: { x: 2220, y: 3900 }, reward: 1800 },
+import {CONFIG} from './config.js';
+export const MISSIONS=[
+{id:'fare',title:'First Fare',giver:'Mama Rosa',briefing:'Take my parcel down to the Marina. Keep it dry, keep it quiet.',objective:'Drive Mama Rosa’s package to the marina',x:3380,y:3520,reward:250},
+{id:'wheels',title:'Hot Wheels',giver:'Mama Rosa',briefing:'A red sport car is waiting in Old Town. Bring it to the garage.',objective:'Steal a sport car and deliver it to the garage',x:730,y:1980,reward:500},
+{id:'payback',title:'Payback Time',giver:'Mama Rosa',briefing:'They know your face. Shake the heat, then come home.',objective:'Lose a 2-star wanted level, reach the safehouse',x:560,y:2800,reward:700},
+{id:'beach',title:'Beach Run',giver:'Mama Rosa',briefing:'One quick drop across town. You have 70 seconds.',objective:'Make the timed delivery across Solmar',x:3650,y:1080,reward:600,timer:70},
+{id:'score',title:'The Big Score',giver:'Mama Rosa',briefing:'Downtown vault, then straight to the Marina boat. Three stars minimum.',objective:'Rob the Downtown vault, then escape to the Marina boat',x:3450,y:3680,vaultX:2050,vaultY:1600,reward:1800}
 ];
-export function updateMissions(state, dt) {
-  const m = state.mission; if (!m || m.complete || state.phase !== 'playing') return;
-  const def = MISSIONS[m.id - 1]; const p = state.player;
-  if (def.time && m.stage === 0) { m.timer -= dt; if (m.timer <= 0) { m.failed = true; state.toast = 'DELIVERY MISSED'; m.active = false; return; } }
-  const d = Math.hypot(p.x - m.waypoint.x, p.y - m.waypoint.y); m.distance = Math.round(d);
-  if (m.id === 2 && m.stage === 0 && p.inCar && p.carKind === 'sport') { m.stage = 1; m.waypoint = { ...def.garage }; state.toast = 'SPORT CAR SECURED — TAKE IT TO THE GARAGE'; }
-  if (m.id === 3 && m.stage === 0 && state.wanted === 0) { m.stage = 1; state.toast = 'PATROLS LOST — SAFEHOUSE'; }
-  if (m.id === 5 && m.stage === 0 && d < 100) { m.stage = 1; state.wanted = Math.max(3, state.wanted); m.waypoint = { ...def.boat }; state.toast = 'VAULT HIT — GET TO THE BOAT'; }
-  if (m.id === 5 && m.stage === 1) state.wanted = Math.max(3, state.wanted);
-  if (d < 92 && (m.id !== 2 || m.stage === 1) && (m.id !== 3 || m.stage === 1) && (m.id !== 5 || m.stage === 1)) {
-    if (m.id === 3 && state.wanted > 0) return; if (m.id === 5 && state.wanted < 3) return;
-    m.complete = true; m.active = false; state.money += def.reward; state.toast = `${def.title.toUpperCase()} COMPLETE  +${def.reward} SOL`; state.completedMissions = Math.max(state.completedMissions, m.id);
-    if (m.id === MISSIONS.length) { state.money += 1500; state.phase = 'complete'; state.toast = 'SOLMAR STORY COMPLETE  +1500 SOL'; }
-    else { const next = MISSIONS[m.id]; state.mission = { id: m.id + 1, stage: 0, waypoint: { ...next.waypoint }, active: true, distance: 0, timer: next.time || 0 }; if (next.id === 3) state.wanted = Math.max(2, state.wanted); }
-  }
-}
-export function startMission(state) { if (!state.mission || state.mission.active || state.mission.complete) return; const def = MISSIONS[state.mission.id - 1]; state.mission.active = true; state.mission.timer = def.time || 0; state.toast = `${def.title.toUpperCase()} — ${def.objectives[0].toUpperCase()}`; if (state.mission.id === 3) state.wanted = Math.max(2, state.wanted); }
+export function updateMissions(s,dt){const m=MISSIONS[s.missionIndex];if(!m||s.phase!=='playing')return;if(m.timer&&s.missionActive)s.missionTime-=dt;if(s.missionActive){const d=Math.hypot(s.player.x-m.x,s.player.y-m.y);s.waypoint={x:m.x,y:m.y};if(s.missionIndex===2){if(s.wanted>=2)s.missionSawHeat=true;if(s.missionSawHeat&&s.wanted===0)s.missionEscaped=true;if(s.missionEscaped&&d<95)complete(s)}else if(s.missionIndex===4){if(!s.vaultRobbed){s.waypoint={x:m.vaultX,y:m.vaultY};if(Math.hypot(s.player.x-m.vaultX,s.player.y-m.vaultY)<95){s.vaultRobbed=true;s.wanted=Math.max(3,s.wanted);s.message='VAULT HIT — GET TO THE BOAT';s.waypoint={x:m.x,y:m.y}}}else if(d<120&&s.wanted>=3)complete(s)}else if(d<100&&(s.missionIndex!==0||!!s.player.car)&&(s.missionIndex!==1||(s.player.car&&s.player.car.kind==='sport')))complete(s);if(m.timer&&s.missionTime<=0){s.missionActive=false;s.missionFailed=true;s.message='Delivery missed — press Enter to retry'}}else if(s.input?.enterPressed){s.missionActive=true;s.missionTime=m.timer||0;s.vaultRobbed=false;s.missionEscaped=false;s.message=m.briefing}}
+function complete(s){const m=MISSIONS[s.missionIndex];s.money+=m.reward;s.message='JOB COMPLETE  +'+m.reward+' sol';s.missionActive=false;s.missionIndex++;s.missionDone=true;if(s.missionIndex>=MISSIONS.length){s.money+=1000;s.phase='complete';s.message='SOLMAR STORY COMPLETE  +1000 sol'}}
