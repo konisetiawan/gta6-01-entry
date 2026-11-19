@@ -1,7 +1,1 @@
-export const CONFIG = {
-  width: 1280, height: 720, worldWidth: 4096, worldHeight: 4096, grid: 256, roadWidth: 72, sidewalk: 16,
-  colors: { sea: '#2a9fa3', deepSea: '#187f8b', sand: '#e9c77e', road: '#59646a', roadEdge: '#455057', lane: '#e8cc83', sidewalk: '#d6c297', grass: '#77a867', park: '#8bbb69', ink: '#172a2e', cream: '#fff4d5', coral: '#ed705b', gold: '#ffd469' },
-  playerWalk: 175, sprint: 265, carAccel: 390, carMax: 430, carBrake: 520, steer: 2.6, wantedThresholds: [0, 1, 2, 3, 4],
-  prices: { stolenCar: 90, taxiFare: 120, sunCoin: 75 },
-  missionRewards: [300, 550, 750, 950, 1800], wantedDecay: 0.075, healthMax: 100,
-};
+export const CONFIG={W:1280,H:720,WORLD:4096,ROAD:112,BLOCK:256,colors:{water:'#167f91',deepWater:'#116b7d',sand:'#edc77e',road:'#3c5159',roadLine:'#d9c783',sidewalk:'#b9aa83',grass:'#74905e',white:'#fff5df',ink:'#17252b',red:'#f15a4a',gold:'#ffd466'},speed:{walk:150,sprint:235,car:390,traffic:110,police:175},prices:{car:120,health:75},wanted:[0,2,5,10,16,24],missionRewards:[250,500,700,600,1800]};
