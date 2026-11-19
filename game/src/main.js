@@ -1,22 +1,3 @@
-import { CONFIG } from './config.js';
-import { createRandom } from './random.js';
-import { createGameState, updateGame, loadGame } from './game.js';
-import { renderGame } from './render.js';
-import { createInput } from './input.js';
-import { createAudio } from './audio.js';
-import { stageShot } from './shots.js';
-
-const canvas = document.querySelector('#game'); const ctx = canvas.getContext('2d'); const input = createInput(canvas); const audio = createAudio();
-const url = new URL(location.href), shot = url.searchParams.get('shot'), seed = Number(url.searchParams.get('seed') || 7);
-const state = createGameState(createRandom(seed));
-let running = true;
-function resize() { const ratio = Math.min(window.devicePixelRatio || 1, 2); canvas.width = CONFIG.width * ratio; canvas.height = CONFIG.height * ratio; canvas.style.width = `${Math.min(innerWidth, innerHeight * 16 / 9)}px`; canvas.style.height = `${Math.min(innerHeight, innerWidth * 9 / 16)}px`; ctx.setTransform(ratio, 0, 0, ratio, 0, 0); }
-window.addEventListener('resize', resize); resize();
-if (shot) { stageShot(state, shot, seed); for (let i = 0; i < 3; i++) updateGame(state, { justPressed: () => false, down: () => false }, 1 / 60); renderGame(ctx, state); }
-else {
-  loadGame(state);
-  let last = performance.now(), accumulator = 0; const step = 1 / 60;
-  function frame(now) { if (!running) return; accumulator += Math.min(.1, (now - last) / 1000); last = now; while (accumulator >= step) { updateGame(state, input, step); audio.setMuted(state.muted); audio.update(state); input.endFrame(); accumulator -= step; } renderGame(ctx, state); requestAnimationFrame(frame); }
-  requestAnimationFrame(frame);
-}
-window.addEventListener('pagehide', () => { running = false; input.dispose(); });
+import {createRandom} from './random.js';import {createGameState,updateGame,saveGame,loadGame} from './game.js';import {renderGame} from './render.js';import {createInput} from './input.js';import {createAudio} from './audio.js';import {stageShot} from './shots.js';
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');const params=new URLSearchParams(location.search),shot=params.get('shot'),seed=Number(params.get('seed')||1);const random=createRandom(seed);const state=createGameState(random);state.seed=seed;const input=createInput(),audio=createAudio();let last=performance.now(),acc=0,prevMission=0,saveTimer=0;
+if(shot){stageShot(state,shot,seed);for(let i=0;i<3;i++)updateGame(state,{up:false,down:false,left:false,right:false},1/60);renderGame(ctx,state)}else{loadGame(state);function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const keys=input.read();if(keys.mutePressed){audio.gesture();audio.toggle()}if(keys.enterPressed||keys.punchPressed||keys.up||keys.down)audio.gesture();acc+=dt;while(acc>=1/60){updateGame(state,keys,1/60);acc-=1/60}if(state.missionIndex>prevMission){audio.complete();prevMission=state.missionIndex}if(state.player.car)audio.engine(state.player.car.speed);if(state.wanted&&Math.random()<.08)audio.siren();saveTimer+=dt;if(saveTimer>8){saveGame(state);saveTimer=0}renderGame(ctx,state);requestAnimationFrame(frame)}requestAnimationFrame(frame)}
