@@ -1,0 +1,40 @@
+import { CONFIG } from './config.js';
+import { buildCity, isWater, randomRoadPoint } from './world.js';
+import { createCar, spawnTraffic, spawnPedestrians, updateTraffic, updatePedestrians, updatePolice } from './entities.js';
+import { MISSIONS, updateMissions, startMission } from './missions.js';
+
+export const SAVE_KEY = 'solmar-save-v1';
+export function createGameState(random) {
+  const state = { random, city: buildCity(random), phase: 'title', time: 0, camera: { x: 0, y: 0 }, player: { x: 2020, y: 1790, vx: 0, vy: 0, angle: 0, health: 100, inCar: false, car: null, carKind: null, punch: 0 }, cars: [], pedestrians: [], police: [], policeOfficers: [], particles: [], wanted: 0, money: 0, heat: 0, mission: { id: 1, stage: 0, waypoint: { ...MISSIONS[0].waypoint }, active: false, distance: 0, timer: 0 }, completedMissions: 0, coins: [], taxiFare: null, toast: 'PRESS ENTER TO MEET MAMA ROSA', toastTime: 4, pausedFrom: 'playing', muted: false, crimeCooldown: 0, saveLoaded: false };
+  spawnTraffic(state, random, 50); spawnPedestrians(state, random, 90);
+  for (let i = 0; i < 26; i++) { const p = randomRoadPoint(random); state.coins.push({ ...p, taken: false }); }
+  state.player.car = createCar('sedan'); return state;
+}
+export function updateGame(state, input, dt) {
+  dt = Math.min(dt, .05); state.time += dt; const p = state.player; state.toastTime = Math.max(0, state.toastTime - dt); state.crimeCooldown = Math.max(0, state.crimeCooldown - dt);
+  if (input.justPressed('p') && ['playing', 'paused'].includes(state.phase)) state.phase = state.phase === 'paused' ? 'playing' : 'paused';
+  if (input.justPressed('m')) state.muted = !state.muted;
+  if (state.phase === 'title') { if (input.justPressed('enter')) { state.phase = 'playing'; state.money = state.saveLoaded ? state.money : 250; startMission(state); state.toastTime = 5; } return; }
+  if (state.phase === 'paused' || ['busted', 'wasted', 'complete'].includes(state.phase)) { if (input.justPressed('enter') && ['busted', 'wasted'].includes(state.phase)) resetAfterFailure(state); return; }
+  if (input.justPressed('r')) { saveGame(state); state.toast = 'GAME SAVED'; state.toastTime = 2; }
+  if (input.justPressed('e')) {
+    if (p.inCar) { const car = p.car; p.x = car.x + Math.cos(car.angle + Math.PI / 2) * 46; p.y = car.y + Math.sin(car.angle + Math.PI / 2) * 46; car.parked = true; p.inCar = false; p.car = null; p.carKind = null; }
+    else { const taxi = state.cars.find(c => c.kind === 'taxi' && c.parked && Math.hypot(c.x - p.x, c.y - p.y) < 82); const passenger = state.pedestrians.find(person => person.alive && Math.hypot(person.x - p.x, person.y - p.y) < 55); if (taxi && passenger && !state.taxiFare) { passenger.alive = false; state.taxiFare = { destination: randomRoadPoint(state.random), pickedUp: true }; state.toast = 'FARE ON BOARD — FOLLOW THE GOLD ROUTE'; state.toastTime = 3; } else { const car = [...state.cars, ...state.police].find(c => Math.hypot(c.x - p.x, c.y - p.y) < 72); if (car) { p.inCar = true; p.car = car; p.carKind = car.kind; car.parked = false; if (!car.stolen && car.kind !== 'police' && !(car.kind === 'taxi' && state.taxiFare)) { car.stolen = true; state.wanted = Math.min(5, state.wanted + 1); state.money = Math.max(0, state.money - CONFIG.prices.stolenCar); state.toast = 'VEHICLE STOLEN  •  POLICE ALERT'; state.toastTime = 3; } } } }
+  }
+  const up = input.down('w') || input.down('arrowup'), down = input.down('s') || input.down('arrowdown'), left = input.down('a') || input.down('arrowleft'), right = input.down('d') || input.down('arrowright');
+  if (p.inCar && p.car) { const car = p.car; if (up) car.velocity += CONFIG.carAccel * dt; else if (down) car.velocity -= CONFIG.carBrake * dt; else car.velocity *= Math.pow(.985, dt * 60); car.velocity = Math.max(-100, Math.min(CONFIG.carMax, car.velocity)); const speedFactor = Math.min(1, Math.abs(car.velocity) / 100); car.angle += ((left ? -1 : 0) + (right ? 1 : 0)) * CONFIG.steer * dt * speedFactor * (car.velocity < 0 ? -1 : 1); car.x += Math.cos(car.angle) * car.velocity * dt; car.y += Math.sin(car.angle) * car.velocity * dt; car.x = Math.max(10, Math.min(CONFIG.worldWidth - 10, car.x)); car.y = Math.max(10, Math.min(CONFIG.worldHeight - 10, car.y)); p.x = car.x; p.y = car.y; p.angle = car.angle; if (Math.abs(car.velocity) > 220 && state.time % .09 < dt) state.particles.push({ x: p.x, y: p.y, life: .45, color: '#e2c98b', size: 4, kind: 'skid' });
+    for (const ped of state.pedestrians) if (ped.alive && Math.hypot(ped.x - p.x, ped.y - p.y) < 24 && Math.abs(car.velocity) > 80) { ped.alive = false; state.wanted = Math.min(5, state.wanted + 1); p.health -= 2; state.toast = 'PEDESTRIAN HIT  •  WANTED LEVEL UP'; state.toastTime = 2.5; }
+  } else { const dx = (right ? 1 : 0) - (left ? 1 : 0), dy = (down ? 1 : 0) - (up ? 1 : 0); const len = Math.hypot(dx, dy) || 1, speed = input.down('shift') ? CONFIG.sprint : CONFIG.playerWalk; p.vx = dx / len * speed; p.vy = dy / len * speed; p.x = Math.max(10, Math.min(CONFIG.worldWidth - 10, p.x + p.vx * dt)); p.y = Math.max(10, Math.min(CONFIG.worldHeight - 10, p.y + p.vy * dt)); if (dx || dy) p.angle = Math.atan2(dy, dx); if (input.justPressed('space')) { p.punch = .25; state.particles.push({ x: p.x + Math.cos(p.angle) * 28, y: p.y + Math.sin(p.angle) * 28, life: .2, color: '#fff0b5', size: 9, kind: 'muzzle' }); for (const ped of state.pedestrians) if (ped.alive && Math.hypot(ped.x - p.x, ped.y - p.y) < 40) { ped.flee = 4; ped.angle = Math.atan2(ped.y - p.y, ped.x - p.x); state.wanted = Math.min(5, state.wanted + 1); break; } } }
+  p.punch = Math.max(0, p.punch - dt);
+  updateTraffic(state, dt); updatePedestrians(state, dt); updatePolice(state, dt); updateMissions(state, dt);
+  for (const coin of state.coins) if (!coin.taken && Math.hypot(coin.x - p.x, coin.y - p.y) < 34) { coin.taken = true; state.money += CONFIG.prices.sunCoin; state.toast = 'SUN COIN  +75 SOL'; state.toastTime = 2; state.particles.push({ x: coin.x, y: coin.y, life: .8, color: CONFIG.colors.gold, size: 12, kind: 'coin' }); }
+  if (state.taxiFare && p.inCar && p.carKind === 'taxi' && Math.hypot(state.taxiFare.destination.x - p.x, state.taxiFare.destination.y - p.y) < 82) { state.money += CONFIG.prices.taxiFare; state.taxiFare = null; state.toast = 'FARE COMPLETE  +120 SOL'; state.toastTime = 3; }
+  if (state.wanted > 0) { const nearPolice = state.police.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 360); if (!nearPolice) state.heat += dt; else state.heat = Math.max(0, state.heat - dt * 2); if (state.heat > 7 / state.wanted) { state.wanted = Math.max(0, state.wanted - 1); state.heat = 0; state.toast = 'YOU LOST THE POLICE'; state.toastTime = 2; } }
+  for (const q of state.particles) q.life -= dt; state.particles = state.particles.filter(q => q.life > 0);
+  if (p.health <= 0) state.phase = 'wasted';
+  state.camera.x += (p.x - CONFIG.width / 2 - state.camera.x) * Math.min(1, dt * 5); state.camera.y += (p.y - CONFIG.height / 2 - state.camera.y) * Math.min(1, dt * 5);
+  if (state.time % 4 < dt) saveGame(state);
+}
+export function saveGame(state) { try { localStorage.setItem('solmar-save-v1', JSON.stringify({ money: state.money, completedMissions: state.completedMissions, wanted: state.wanted, x: state.player.x, y: state.player.y })); } catch {} }
+export function loadGame(state) { try { const d = JSON.parse(localStorage.getItem('solmar-save-v1') || 'null'); if (d) { state.money = d.money || 0; state.completedMissions = d.completedMissions || 0; state.mission.id = Math.min(5, state.completedMissions + 1); state.mission.waypoint = { ...MISSIONS[state.mission.id - 1].waypoint }; state.player.x = d.x || state.player.x; state.player.y = d.y || state.player.y; state.saveLoaded = true; } } catch {} return state; }
+function resetAfterFailure(s) { s.phase = 'playing'; s.player.health = 100; s.wanted = 0; s.police = []; s.player.x = 2020; s.player.y = 1790; s.player.inCar = false; s.player.car = null; s.player.carKind = null; s.toast = 'BACK ON THE STREETS'; s.toastTime = 2; }
