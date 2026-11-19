@@ -1,13 +1,7 @@
-import { createRandom } from './random.js';
-import { createGameState } from './game.js';
-import { createCar } from './entities.js';
-import { MISSIONS } from './missions.js';
-export function stageShot(state, name, seed = 7) {
-  const r = createRandom(seed); const fresh = createGameState(r); Object.assign(state, fresh); state.random = r; state.phase = name === 'start' ? 'title' : 'playing'; state.money = name === 'chase' ? 1250 : 875; state.wanted = name === 'chase' ? 3 : name === 'street' ? 1 : 0;
-  state.player.health = 100; state.player.inCar = false; state.player.car = null; state.player.carKind = null; state.police = []; state.mission.active = false; state.toast = ''; state.toastTime = 0;
-  if (name === 'start') { state.player.x = 2048; state.player.y = 1780; state.camera.x = 1408; state.camera.y = 1420; }
-  if (name === 'chase') { state.player.x = 2040; state.player.y = 1880; const car = createCar('sport'); Object.assign(car, { x: state.player.x, y: state.player.y, angle: -.1, velocity: 315, stolen: true }); state.player.car = car; state.player.inCar = true; state.player.carKind = 'sport'; state.cars = state.cars.slice(0, 22); state.cars.push(car); state.police = []; for (let i = 0; i < 2; i++) { const c = createCar('police'); Object.assign(c, { x: 1780 - i * 95, y: 1960 + i * 25, angle: -.1, velocity: 220, siren: i + .4 }); state.police.push(c); } state.mission = { id: 5, stage: 1, waypoint: { x: 2220, y: 3900 }, active: true, distance: Math.round(Math.hypot(180, 2020)), timer: 0 }; state.completedMissions = 4; state.camera.x = state.player.x - 640; state.camera.y = state.player.y - 360; }
-  if (name === 'street') { state.player.x = 2020; state.player.y = 3670; state.cars = state.cars.slice(0, 28); state.pedestrians = state.pedestrians.slice(0, 58); state.camera.x = state.player.x - 640; state.camera.y = state.player.y - 360; state.police = []; }
-  if (name === 'mission') { state.player.x = 960; state.player.y = 2670; const car = createCar('sport'); Object.assign(car, { x: 1038, y: 2670, angle: .03, velocity: 0, parked: true }); state.cars = state.cars.slice(0, 26); state.cars.push(car); state.mission = { id: 2, stage: 0, waypoint: { x: 1038, y: 2670 }, active: true, distance: Math.round(Math.hypot(78, 0)), timer: 0 }; state.camera.x = state.player.x - 640; state.camera.y = state.player.y - 360; }
-  return state;
-}
+import {MISSIONS} from './missions.js';import {createCar,spawnTraffic,spawnPedestrians,spawnPolice} from './entities.js';import {createRandom} from './random.js';
+export function stageShot(s,name,seed){const r=createRandom(seed);s.phase=name==='start'?'title':'playing';s.money=name==='chase'?1250:500;s.wanted=name==='chase'?3:name==='street'?1:0;s.player.health=100;s.player.car=null;s.cars=[];s.peds=[];s.police=[];s.missionActive=false;s.waypoint=null;s.camera={x:0,y:0};s.message='';
+if(name==='chase'){s.player.x=2070;s.player.y=2040;const car=createCar('sport');Object.assign(car,{x:s.player.x,y:s.player.y,a:0,speed:238,occupied:true});s.player.car=car;s.cars.push(car);spawnTraffic(s,r,30);spawnPolice(s,2);s.police.forEach((p,i)=>{p.x=s.player.x-230-i*110;p.y=s.player.y-50-i*65;p.a=0;p.speed=195});s.missionIndex=4;s.missionActive=true;s.vaultRobbed=true;s.waypoint={x:3450,y:3680}}
+else if(name==='street'){s.player.x=2520;s.player.y=3510;spawnTraffic(s,r,28);spawnPedestrians(s,r,42);s.missionIndex=0;s.waypoint={x:3380,y:3520};s.cars.forEach((c,i)=>{c.x=2200+(i%7)*155;c.y=3370+Math.floor(i/7)*150})}
+else if(name==='mission'){s.player.x=835;s.player.y=2050;const car=createCar('sport');Object.assign(car,{x:950,y:2040,a:Math.PI,speed:0,parked:true});s.cars.push(car);spawnTraffic(s,r,18);spawnPedestrians(s,r,32);s.cars.slice(1).forEach((c,i)=>{c.x=650+(i%6)*160;c.y=1840+Math.floor(i/6)*180});s.missionIndex=1;s.missionActive=true;s.waypoint={x:2060,y:2040}}
+else{s.player.x=2030;s.player.y=2020;spawnTraffic(s,r,46);spawnPedestrians(s,r,58);s.cars.forEach((c,i)=>{c.x=1700+(i%8)*140;c.y=1900+Math.floor(i/8)*100});s.missionIndex=0}
+s.camera={x:s.player.x-640,y:s.player.y-360};s.time=2;return s}
